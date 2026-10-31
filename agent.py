@@ -188,6 +188,7 @@ def solve_round1(case: dict) -> dict:
         }
 
 
+
 # ============================================================
 # ROUND 2 - ROUTE NAVIGATION
 # Focus: Route analysis and route selection
@@ -202,7 +203,8 @@ def analyse_routes(case: dict) -> dict:
     - Identify route conditions.
     - Analyse route suitability.
     """
-    pass
+    
+    
 
 
 def compare_routes(case: dict) -> dict:
