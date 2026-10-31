@@ -203,6 +203,36 @@ def analyse_routes(case: dict) -> dict:
     - Identify route conditions.
     - Analyse route suitability.
     """
+    routes = {}
+    for m in case.get("missions", []):
+        mid = m["id"]
+        is_blocked = bool(m.get("route_blocked", False))
+        alt_dist = m.get("alternate_distance")
+        direct_dist = m.get("distance")
+
+        if is_blocked:
+            if alt_dist is not None:
+                routes[mid] = {
+                    "usable": True,
+                    "distance": alt_dist,
+                    "uses_alternate": True,
+                    "description": "alternate route",
+                }
+            else:
+                routes[mid] = {
+                    "usable": False,
+                    "distance": None,
+                    "uses_alternate": False,
+                    "description": "blocked with no alternate",
+                }
+        else:
+            routes[mid] = {
+                "usable": True,
+                "distance": direct_dist,
+                "uses_alternate": False,
+                "description": "direct route",
+            }
+    return routes
     
     
 
@@ -215,7 +245,9 @@ def compare_routes(case: dict) -> dict:
     - Compare route characteristics.
     - Evaluate route suitability.
     """
-    pass
+    
+    
+    
 
 
 def select_best_route(case: dict) -> dict:
