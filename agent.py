@@ -32,7 +32,11 @@ OLLAMA_URL = "https://ollama.com/v1/chat/completions"
 
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL")
-
+WEATHER_FACTORS: Dict[str, float] = {
+    "clear": 1.0,
+    "rain": 1.25,
+    "storm": 1.5,
+}
 
 # ============================================================
 # ROUND 1 - BASIC RESCUE FEASIBILITY
@@ -48,8 +52,14 @@ def calculate_fuel(case: dict) -> dict:
     - Calculate required fuel.
     - Return the calculated fuel requirement.
     """
-    pass
-
+    missions = case.get("missions", [])
+    if not missions:
+        return {"fuel_needed": 0, "distance": 0}
+    m = missions[0]
+    distance = m.get("distance", 0)
+    fuel_needed = math.ceil(distance / 10)
+    return {"fuel_needed": fuel_needed, "distance": distance}
+    
 
 def calculate_travel_time(case: dict) -> dict:
     """
@@ -60,7 +70,22 @@ def calculate_travel_time(case: dict) -> dict:
     - Consider the given travel conditions.
     - Calculate estimated travel time.
     """
-    pass
+    missions = case.get("missions", [])
+    if not missions:
+        return {"travel_time": 0, "weather": "clear"}
+    m = missions[0]
+    distance = m.get("distance", 0)
+    weather = case.get("weather", "clear")
+    factor = WEATHER_FACTORS.get(weather, 1.0)
+    travel_time = math.ceil(distance * factor)
+    return {
+        "travel_time": travel_time,
+        "weather": weather,
+        "deadline": m.get("deadline", 0),
+    }
+    
+    
+
 
 
 def assess_mission(case: dict) -> dict:
@@ -72,7 +97,60 @@ def assess_mission(case: dict) -> dict:
     - Analyse travel time.
     - Compare with the given constraints.
     """
-    pass
+    missions = case.get("missions", [])
+    if not missions:
+        return {"feasible": False, "reason": "No mission available"}
+
+    m = missions[0]
+    resources = case.get("resources", {})
+    fuel_info = calculate_fuel(case)
+    time_info = calculate_travel_time(case)
+
+    fuel_needed = fuel_info["fuel_needed"]
+    travel_time = time_info["travel_time"]
+
+    if m.get("route_blocked", False):
+        return {"feasible": False, "reason": "Direct route is blocked"}
+
+    if fuel_needed > resources.get("fuel", 0):
+        return {
+            "feasible": False,
+            "reason": "Insufficient fuel",
+            "fuel_needed": fuel_needed,
+            "why": "resources",
+        }
+
+    if m.get("kits", 0) > resources.get("kits", 0):
+        return {
+            "feasible": False,
+            "reason": "Insufficient kits",
+            "why": "resources",
+        }
+
+    if m.get("personnel", 0) > resources.get("personnel", 0):
+        return {
+            "feasible": False,
+            "reason": "Insufficient personnel",
+            "why": "resources",
+        }
+
+    if travel_time > m.get("deadline", 0):
+        return {
+            "feasible": False,
+            "reason": "Deadline cannot be met",
+            "why": "deadline",
+        }
+
+    return {
+        "feasible": True,
+        "mission_id": m.get("id", "M1"),
+        "priority": m.get("severity", 1),
+        "fuel_needed": fuel_needed,
+        "kits_needed": m.get("kits", 0),
+        "personnel_needed": m.get("personnel", 0),
+        "reason": "Mission is feasible within fuel, resource and time limits",
+    }
+
 
 
 def solve_round1(case: dict) -> dict:
@@ -84,7 +162,30 @@ def solve_round1(case: dict) -> dict:
     - Decide whether to dispatch or reject.
     - Return the required output format.
     """
-    pass
+    missions = case.get("missions", [])
+    m = missions[0] if missions else {}
+    severity = m.get("severity", 1)
+    mission_id = m.get("id", "M1")
+
+    assessment = assess_mission(case)
+    if assessment.get("feasible"):
+        return {
+            "action": "dispatch",
+            "priority": assessment.get("priority", severity),
+            "reason": assessment.get("reason", "Mission is urgent and feasible"),
+            "mission_id": mission_id,
+            "uses_alternate_route": False,
+            "fuel_needed": assessment.get("fuel_needed", 0),
+            "kits_needed": assessment.get("kits_needed", 0),
+            "personnel_needed": assessment.get("personnel_needed", 0),
+        } 
+    else:
+        return {
+            "action": "reject",
+            "priority": severity,
+            "reason": assessment.get("reason", "Mission is not feasible"),
+            "mission_id": mission_id,
+        }
 
 
 # ============================================================
