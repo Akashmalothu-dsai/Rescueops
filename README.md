@@ -5,7 +5,7 @@
 
 Build an agent that reads a rescue scenario and returns a safe, smart decision. You write the strategy in **`agent.py`**; the starter only shows the interface.
 
-## Quick start (clone and run)
+## Quick start (clone and run) 
 
 You need **Git** and **Python 3.10+** installed.
 
