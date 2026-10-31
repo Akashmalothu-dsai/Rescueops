@@ -245,9 +245,69 @@ def compare_routes(case: dict) -> dict:
     - Compare route characteristics.
     - Evaluate route suitability.
     """
-    
-    
-    
+    route_analysis = analyse_routes(case)
+    weather = case.get("weather", "clear")
+    factor = WEATHER_FACTORS.get(weather, 1.0)
+    resources = case.get("resources", {})
+    evaluated = []
+
+    for m in case.get("missions", []):
+        mid = m["id"]
+        rinfo = route_analysis.get(mid, {})
+        if not rinfo.get("usable"):
+            evaluated.append({
+                "mission": m,
+                "feasible": False,
+                "reason": "Route blocked and no alternate route available",
+                "why": "route",
+            })
+            continue
+
+        dist = rinfo["distance"]
+        fuel_needed = math.ceil(dist / 10)
+        travel_time = math.ceil(dist * factor)
+
+        if fuel_needed > resources.get("fuel", 0):
+            evaluated.append({
+                "mission": m,
+                "feasible": False,
+                "reason": "Insufficient fuel for route",
+                "why": "resources",
+            })
+        elif m.get("kits", 0) > resources.get("kits", 0):
+            evaluated.append({
+                "mission": m,
+                "feasible": False,
+                "reason": "Insufficient kits",
+                "why": "resources",
+            })
+        elif m.get("personnel", 0) > resources.get("personnel", 0):
+            evaluated.append({
+                "mission": m,
+                "feasible": False,
+                "reason": "Insufficient personnel",
+                "why": "resources",
+            })
+        elif travel_time > m.get("deadline", 0):
+            evaluated.append({
+                "mission": m,
+                "feasible": False,
+                "reason": "Deadline cannot be met",
+                "why": "deadline",
+            })
+        else:
+            evaluated.append({
+                "mission": m,
+                "feasible": True,
+                "distance": dist,
+                "fuel_needed": fuel_needed,
+                "travel_time": travel_time,
+                "uses_alternate": rinfo["uses_alternate"],
+                "kits_needed": m.get("kits", 0),
+                "personnel_needed": m.get("personnel", 0),
+                "reason": f"Route ({rinfo['description']}) is safe and within limits",
+            })
+        return {"evaluated": evaluated}
 
 
 def select_best_route(case: dict) -> dict:
@@ -258,7 +318,24 @@ def select_best_route(case: dict) -> dict:
     - Select an appropriate route.
     - Return the selected route information.
     """
-    pass
+    comp = compare_routes(case)
+    feasible = [e for e in comp.get("evaluated", []) if e.get("feasible")]
+
+    if feasible:
+        # Prefer higher severity, then tighter deadline, then lower fuel
+        best = min(
+            feasible,
+            key=lambda x: (
+                -x["mission"].get("severity", 1),
+                x["mission"].get("deadline", 9999),
+                x["fuel_needed"],
+            )
+        )
+        return {"selected": best, "feasible": True}
+
+    return {"selected": None, "feasible": False, "evaluated": comp.get("evaluated", [])}
+
+
 
 
 def solve_round2(case: dict) -> dict:
@@ -269,7 +346,38 @@ def solve_round2(case: dict) -> dict:
     - Use your route analysis functions.
     - Generate the final route decision.
     """
-    pass
+    selection = select_best_route(case)
+    missions = case.get("missions", [])
+
+    if selection.get("feasible"):
+        best = selection["selected"]
+        m = best["mission"]
+        uses_alt = best["uses_alternate"]
+        action = "reroute" if uses_alt else "dispatch"
+        return {
+            "action": action,
+            "priority": m.get("severity", 1),
+            "reason": best.get("reason", "Route is feasible"),
+            "mission_id": m.get("id"),
+            "uses_alternate_route": uses_alt,
+            "fuel_needed": best["fuel_needed"],
+            "kits_needed": best["kits_needed"],
+            "personnel_needed": best["personnel_needed"],
+        }
+    else:
+        # Find default priority
+        max_sev = max([m.get("severity", 1) for m in missions], default=1)
+        reasons = [e.get("reason") for e in selection.get("evaluated", []) if e.get("reason")]
+        reason_text = reasons[0] if reasons else "No usable route available"
+        first_id = missions[0]["id"] if missions else None
+        res: Dict[str, Any] = {
+            "action": "reject",
+            "priority": max_sev,
+            "reason": reason_text,
+        }
+        if first_id:
+            res["mission_id"] = first_id
+        return res
 
 
 # ============================================================
