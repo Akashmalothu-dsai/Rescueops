@@ -1,5 +1,31 @@
-.env
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
 .venv/
+ENV/
+
+# Environment Variables & Secrets
+.env
+.env.local
+*.env
+
+# Archives & Builds
 *.zip
+dist/
+build/
+*.egg-info/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing & Logs
+.pytest_cache/
+*.log
